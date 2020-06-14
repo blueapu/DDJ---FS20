@@ -27,8 +27,9 @@ https://lms.uzh.ch/auth/1%3A1%3A1210638843%3A3%3A0%3Aserv%3Ax/data/NR_SR_Jan_Okt
   + Benötigt die Datensätze _txt_all.rds_, _txt_crn.rds_, _txt_gstl.rds_, _txt_klima.rds_, _txt_rest.rds_ (siehe oben)
 <br><br>
 
+*****
 
-**Schlüsselworte** Folgende Schlüsselworte wurden benutzt, um die verschiedenen Tweets zu identifizieren. Dabei genügt es, wenn die untengenannten ausdrücke zum Teil enthalten sind, gross- bzw. kleinschreibung spielt keine rolle (_partial match_ & _case insensitive_):
+**Schlüsselworte**<br>Folgende Schlüsselworte wurden benutzt, um die verschiedenen Tweets zu identifizieren. Dabei genügt es, wenn die untengenannten ausdrücke zum Teil enthalten sind, gross- bzw. kleinschreibung spielt keine rolle (_partial match_ & _case insensitive_):
   + Corona: "corona", "covid", "shutdown", "lockdown", "virus", "pandemie"
   + Gleichstellung: "metoo""helvetiaruft", "gleichberech", "lohngleich", "gleichstell", "equalpayday", " gender", "sexis", "frauen", "feminis"
   + Klima: "klima", "erwärmung"
