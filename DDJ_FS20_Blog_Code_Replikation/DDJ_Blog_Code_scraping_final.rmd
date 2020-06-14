@@ -1,0 +1,176 @@
+---
+title: "DDJ Blogbeitrag **Scraping**  _final_"
+author: "Markus Rottmann"
+date: "2020 03 26"
+output:
+  html_document:
+      toc: true
+      toc_depth: 5
+---
+
+
+```{r setup, include=FALSE}
+
+## 0.1: cleaing memory
+rm(list=ls(all=T))
+
+## 0.2 defining options
+options(repos="https://cran.rstudio.com")
+options(stringsAsFactors = FALSE)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 5)
+
+## 0.3 installing and loading needed packages
+# install & load packages
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("knitr")
+library(knitr)
+# install.packages("kableExtra")
+# library(kableExtra)
+# install.packages("rvest")
+library(rvest)
+# install.packages("magrittr")
+library(magrittr)
+# install.packages("pageviews")
+# library(pageviews)
+# install.packages("WikipediR")
+# library(WikipediR)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.packages("tibble")
+# library(tibble)
+# install.packages("quanteda")
+library(quanteda)
+# install.packages("stargazer")
+library(stargazer)
+# install.packages("tidyr")
+library(tidyr)
+# install.packages("stringr")
+library(stringr)
+#install.packages("lme4")
+library(lme4)
+# install.packages("rtweet")
+library(rtweet)
+# install.packages("lubridate")
+library(lubridate)
+
+
+
+
+
+```
+
+***
+
+### Hinweis
+
+Alle Chunks sind auf `eval = FALSE` gestellt. Siehe unten.
+
+Dieser Code funktioniert, sobald in Abschnitt 1.2 folgende Twitter-Zugangsdaten (persönlich) eingegeben sind:
+  
+  + consumer_key
+  + consumer_secret
+  + access_token
+  + access_secret 
+  
+Datenquellen:
+ 
+  + Der Datensatz `df_infodat.rds` wurde von Hand erstellt.
+  + Der Datensatz `NR_SR_Jan_Okt_2019.RData` wurde von den Kursleitern zur Verfügung gestellt.
+
+***
+
+### 1. Vorbereitung
+
+#### 1.1 Laden und Vorbereiten der Grunddaten
+
+```{r 01_01, include = TRUE, results = TRUE, eval = FALSE, message = FALSE, warning = FALSE}
+
+## Daten Laden
+# Datensatz vom Digital Democracy Lab
+load("./RawData/NR_SR_Jan_Okt_2019.RData")
+data00 <- NR_SR_Jan_Okt_2019
+
+# Daten ins richtige Format bringen
+data00$Datum <- as.Date(data00$Datum, "%Y-%m-%d")
+data00 <- data00 %>% 
+          filter(., !(Gender %in% NA))
+data00$Gender <- as.factor(as.character(data00$Gender))
+data00$Incumbent <- as.factor(as.character(data00$Incumbent))
+
+# Daten von smartvote
+var_sel <- c("lastname", "firstname", "party_short", "rat", "status", "year_of_birth", "district",
+             "gender", "LINK_Twitter", "zip")
+data01 <- readRDS("./RawData/df_infodat.rds") %>% 
+              select(., var_sel) %>% 
+              filter(., rat %in% c("NR", "SR"))
+
+## Hilfsvariablen löschen
+rm(NR_SR_Jan_Okt_2019, var_sel)
+
+
+```
+
+#### 1.2 Authentifizierung Twitter API
+
+**Notiz:** R-Markdown Code-Chunk `eval = FALSE`, da nicht benötigt, wenn Abschnitt 2. nicht durchgeführt wird.
+
+```{r 01_02, include = TRUE, results = TRUE, eval = FALSE, message = FALSE, warning = FALSE}
+
+## authenticate via access token
+token <- create_token(app = "datajournalism-class",
+consumer_key = "XXXXXX",
+consumer_secret =
+"XXXXXX",
+access_token = "XXXXXX",
+access_secret = "XXXXXX")
+
+```
+
+
+### 2. Letzte 3'200 Tweets scrapen von allen Parlamentariern
+
+In diesem Abschnitt werden die letzten 3'200 Tweets (sofern vorhanden) aller Parlamentarier*innen heruntergeladen.
+
+**Notiz:** R-Markdown Code-Chunk `eval = FALSE`, da sehr lange Ladezeiten.
+
+```{r 02, include = TRUE, results = TRUE, eval = FALSE, message = FALSE, warning = FALSE}
+
+## Daten Filtern auf nur diejenigen, die einen Twitteraccount haben.
+data02 <- data01 %>% 
+    filter(., !(LINK_Twitter %in% NA))
+
+## Abrage aller Parlamentarier (Wahl 2019) Tweets (max. 3200), im Loop
+# Ergebnisvariable schaffen
+df_help0 <- rep(NA, 99)
+
+# Eigentlicher Loop für die Abfrage
+for (i in 1:nrow(data02)) try({
+  df_help <- data02[i, "LINK_Twitter"] %>% 
+  sub(".*https://twitter.com/", "", .) %>% 
+  get_timeline(., n = 3200)
+  
+  df_help$lastname <- data02[i, "lastname"]
+  df_help$firstname <- data02[i, "firstname"]
+  df_help$party_short <- data02[i, "party_short"]
+  df_help$status <- data02[i, "status"]
+  df_help$year_of_birth <- data02[i, "year_of_birth"]
+  df_help$district <- data02[i, "district"] 
+  df_help$zip <- data02[i, "zip"]
+  df_help$gender <- data02[i, "gender"]
+  df_help$rat <- data02[i, "rat"]
+  
+  df_help0 <- rbind(df_help0, df_help)
+  
+})
+
+df_tweets01b <- df_help0
+
+## Datensatz abspeichern
+saveRDS(df_tweets01b, file = "./RawData/df_tweets01b.rds")
+
+## Hilfsvariablen löschen
+rm(df_help, df_help0, i)
+
+```
+

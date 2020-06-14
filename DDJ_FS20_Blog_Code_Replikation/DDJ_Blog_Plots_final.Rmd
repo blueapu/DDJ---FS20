@@ -1,0 +1,178 @@
+---
+title: "DDJ Blogbeitrag **Plots**  _final_"
+author: "Markus Rottmann"
+date: "2020 06 11"
+output:
+  html_document:
+      toc: true
+      toc_depth: 5
+---
+
+
+```{r setup, include=FALSE}
+
+## 0.1: cleaing memory
+rm(list=ls(all=T))
+
+## 0.2 defining options
+options(repos="https://cran.rstudio.com")
+options(stringsAsFactors = FALSE)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 14, fig.height = 8)
+
+## 0.3 installing and loading needed packages
+# install & load packages
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("knitr")
+library(knitr)
+# install.packages("kableExtra")
+# library(kableExtra)
+# install.packages("rvest")
+library(rvest)
+# install.packages("magrittr")
+library(magrittr)
+# install.packages("pageviews")
+# library(pageviews)
+# install.packages("WikipediR")
+# library(WikipediR)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.packages("tibble")
+# library(tibble)
+# install.packages("quanteda")
+library(quanteda)
+# install.packages("stargazer")
+library(stargazer)
+# install.packages("tidyr")
+library(tidyr)
+# install.packages("stringr")
+library(stringr)
+#install.packages("lme4")
+library(lme4)
+# install.packages("rtweet")
+library(rtweet)
+# install.packages("lubridate")
+library(lubridate)
+# install.packages("reshape2")
+library(reshape2)
+# install.packages("ggalt")
+library(ggalt)
+
+```
+
+***
+
+
+### 1. Stacked-Barplot aller Tweets nach Frauenthemen, Corona, Klima und Rest / Pro Woche
+
+Die hier benötigten Datensätze `wk_crn.rds`, `wk_klima.rds`, `wk_glst.rds` und `wk_rest.rds` wurden mit dem Code `DDJ_Blog_Count_final.rds` erstellt.
+
+```{r 01, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+## Daten aller Tweets pro Woche, Klimatweets und Gleichstellungstweets.
+wk_crn <- readRDS("./RawData/wk_crn.rds") %>% 
+  select(., week, twtcnt_wk) %>% 
+  `colnames<-`(c("week", "crn"))
+wk_klima <-  readRDS("./RawData/wk_klima.rds") %>% 
+  select(., week, twtcnt_wk) %>% 
+  `colnames<-`(c("week", "klima"))
+wk_glst <-  readRDS("./RawData/wk_glst.rds") %>% 
+  select(., week, twtcnt_wk) %>% 
+  `colnames<-`(c("week", "glst"))
+wk_rest <- readRDS("./RawData/wk_rest.rds") %>% 
+  select(., week, twtcnt_wk) %>% 
+  `colnames<-`(c("week", "rest"))
+
+# Datenframe zusammenfügen
+data00 <- wk_rest %>% 
+  merge(., wk_klima, by = "week", all.x = TRUE) %>% 
+  merge(., wk_glst, by = "week", all.x = TRUE) %>% 
+  merge(., wk_crn, by = "week", all.x = TRUE)
+# NAs durch "0" ersetzen
+data00[is.na(data00)] <- 0
+
+# Berechnen der Restlichen tweets & 
+data00 <- data00 %>% 
+  select(., week, rest, klima, glst, crn) %>% 
+  melt(., id.vars = "week")
+
+# Stacked
+
+options(repr.plot.width = 14, repr.plot.height = 8)
+
+p0 <- ggplot(data00, aes(fill = factor(variable, levels=c("glst", "klima", "crn", "rest")), y = value, x = week)) + 
+  
+  geom_bar(position="stack", stat="identity") +
+  
+  geom_vline(xintercept = 11, linetype="dashed", 
+                color = "darkgrey", size = 1) +
+  
+  geom_vline(xintercept = 19, linetype="dashed", 
+                color = "darkgrey", size = 1) +
+  
+  scale_x_continuous(name ="Kalenderwochen 2020") +
+  
+  scale_y_continuous(name = "Anzahl Tweets pro Woche [--]", breaks = c(0, 250, 500, 750, 1000), limits = c(0, 1050)) +
+  
+  scale_fill_manual(values = c(rgb(0.61, 0.11, 0.66, maxColorValue = 1), # Frabe v. "Emma"
+                               rgb(0.94, 0.64, 0.49, maxColorValue = 1), # Farbe v. "Republik"
+                               "grey",                                   # Eigenfarbe
+                               rgb(29, 161, 242, maxColorValue = 256)),  # Farbe v. "Twitter"
+                    name = "Tweets zu:", labels = c("Gleichstellung", "Klima", "Corona", "Rest")) 
+
+
+  
+p1 <- p0 +
+      geom_text(aes(x = 4.0, y = 925, 
+             label = "Beginn Shutdown: 13. März"), 
+             lineheight = 1.2,
+             hjust = 0,
+             vjust = 0,
+             colour = "black", 
+             fill = "white", 
+             family="Helvetica", 
+             size = 5.5) +
+ 
+      geom_curve(aes(x = 9, y = 990, xend = 10.8,  yend = 950), 
+              colour = "black", 
+              size = 0.5, 
+              curvature = -0.3,
+              arrow = arrow(length = unit(0.03, "npc"))) +
+  
+      theme_bw() +
+      
+      theme(panel.grid.minor.x=element_blank(),
+            panel.grid.major.x=element_blank(),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size= 14,face="bold"),
+            legend.title = element_text(size = 14),
+            legend.text = element_text(size = 12))
+
+
+p2 <- p1 +
+      geom_text(aes(x = 13, y = 1025, 
+             label = "Ende Shutdown: 11. Mai"), 
+             lineheight = 1.2,
+             hjust = 0,
+             vjust = 0,
+             colour = "black", 
+             family="Helvetica", 
+             size = 5.5) +
+
+     geom_curve(aes(x = 17, y = 990, xend = 18.8,  yend = 950), 
+             colour = "black", 
+             size = 0.5, 
+             curvature = 0.3,
+             arrow = arrow(length = unit(0.03, "npc"))) 
+
+## Anzeigen und Speichern
+p2
+ggsave(p2, filename = "./TablesFigures/stackedbar_tweets.png", dpi = "retina",
+       height = 8, width = 14)
+
+## Hilfsvariablen löschen
+rm(p0, p1, p2)
+
+```
+
+
+

@@ -1,0 +1,556 @@
+---
+title: "DDJ Blogbeitrag **Count**  _Final_"
+author: "Markus Rottmann"
+date: "2020 06 11"
+output:
+  html_document:
+      toc: true
+      toc_depth: 5
+---
+
+
+```{r setup, include=FALSE}
+
+## 0.1: cleaing memory
+rm(list=ls(all=T))
+
+## 0.2 defining options
+options(repos="https://cran.rstudio.com")
+options(stringsAsFactors = FALSE)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 5)
+
+## 0.3 installing and loading needed packages
+# install.packages("vctrs")
+# library(vctrs)
+# install & load packages
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("knitr")
+library(knitr)
+# install.packages("kableExtra")
+# library(kableExtra)
+# install.packages("rvest")
+library(rvest)
+# install.packages("magrittr")
+library(magrittr)
+# install.packages("pageviews")
+# library(pageviews)
+# install.packages("WikipediR")
+# library(WikipediR)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.packages("tibble")
+# library(tibble)
+# install.packages("quanteda")
+library(quanteda)
+# install.packages("stargazer")
+library(stargazer)
+# install.packages("tidyr")
+library(tidyr)
+# install.packages("stringr")
+library(stringr)
+#install.packages("lme4")
+library(lme4)
+# install.packages("rtweet")
+library(rtweet)
+# install.packages("lubridate")
+library(lubridate)
+# install.packages("reshape2")
+library(reshape2)
+# install.packages("tidyverse")
+# library(tidyverse)
+
+
+
+
+```
+
+***
+
+
+### 0. Laden und Vorbereiten der Grunddaten
+
+Die benötigten Datensätze `df_tweets01b.rds` wurden mit dem Code `DDJ_Blog_Code_scraping_final.rmd` erstellt.
+
+```{r 01, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Daten Laden
+# Datensatz vom Digital Democracy Lab
+data00 <- readRDS("./RawData/df_tweets01b.rds")
+
+## Zuordnen der Sprachregionen "lngrgn"
+data00$lngrgn <- as.character("deu")
+data00$lngrgn <- ifelse(data00$district == "Waadt" | data00$district == "Genf" |
+                        data00$district == "Jura" | data00$district == "Wallis" |
+                        data00$district == "Neuenburg" | data00$district == "Freiburg",
+                        "fra", data00$lngrgn)
+data00$lngrgn <- ifelse(data00$district == "Tessin", "ita", data00$lngrgn)
+data00$lngrgn <- as.factor(data00$lngrgn)
+
+## Einfügen der Dummy-Variablen für die Massnahmen
+# Datums-Variable erschaffen
+# Eigene Datumsvariable schaffen & Tweetws auf Zeitraum begrenzen
+data00$date <- data00$created_at %>% 
+  str_extract(., "\\d{4}-\\d{2}-\\d{2}") %>% 
+  as.character(.) %>% 
+  as.Date(., "%Y-%m-%d")
+
+# Einführen einer Post-Massnahmen Dummy-Variablen
+# Massnahme 2020-02-28
+data00$p02_28 <- as.factor(ifelse(data00$date >= "2020-02-28",
+                                  "nachher", "vorher"))
+# Massnahme 2020-03-02
+data00$p03_02 <- as.factor(ifelse(data00$date >= "2020-03-02",
+                                  "nachher", "vorher"))
+# Massnahme 2020-03-13
+data00$p03_13 <- as.factor(ifelse(data00$date >= "2020-03-13",
+                                  "nachher", "vorher"))
+# Massnahme 2020-03-16
+data00$p03_16 <- as.factor(ifelse(data00$date >= "2020-03-16",
+                                  "nachher", "vorher"))
+# Massnahme 2020-04-27
+data00$p04_27 <- as.factor(ifelse(data00$date >= "2020-04-27",
+                                  "nachher", "vorher"))
+# Massnahme 2020-03-13
+data00$p05_11 <- as.factor(ifelse(data00$date >= "2020-05-11",
+                                  "nachher", "vorher"))
+
+# Shutdown / Nicht shutdown:
+data00$shtdwn <- "nachher"
+data00$shtdwn <- ifelse(data00$date <= "2020-03-08", "vorher", data00$shtdwn)
+data00[which(data00$date >= "2020-03-09" &
+             data00$date <= "2020-05-10"), "shtdwn"] <- "waehrend"
+data00$shtdwn <- as.factor(as.character(data00$shtdwn))
+
+## Daten vorfiltern (nur Deutsch & Auswahl der Variablen)..
+## ... rausfiltern von twitterern, die über 75% nicht in Deutsch twittern
+var_sel <- c("user_id", "lastname", "firstname", "party_short", "text",
+             "created_at", "location", "hashtags", "year_of_birth", "district",
+             "status", "rat", "gender", "zip", "lngrgn", "lang", "p02_28", "p03_02",
+             "p03_13", "p03_16", "p04_27", "p05_11", "shtdwn", "screen_name", "date")
+data00 <- data00 %>% 
+  select(., var_sel) %>% 
+  filter(., lang %in% "de") %>% 
+  filter(., lngrgn %in% "deu") %>% 
+  filter(., !screen_name %in% "PieroMarchesi1") %>%  # PieroMarchesi1 twittert überwiegend in italienisch
+  filter(., !screen_name %in% "LorenzQuadri") %>% # LorenzQuadri twittert überwiegend in italienisch
+  filter(., !screen_name %in% "fregazzi") %>%  # fregazzi twittert überwiegend in italienisch
+  filter(., !screen_name %in% "MarcoRomanoPPD") %>%  # MarcoRomanoPPD twittert überwiegend in italienisch
+  filter(., !screen_name %in% "ffivaz") %>%  # ffivaz twittert überwiegend in französich
+  filter(., !screen_name %in% "ada_marra") %>%  # ada_marra twittert überwiegend in französich
+  filter(., !screen_name %in% "LeonorePorchet") %>%  # LeonorePorchet twittert überwiegend in französich
+  filter(., !screen_name %in% "I_Chevalley") %>%  # I_Chevalley twittert überwiegend in französich
+  filter(., !screen_name %in% "isfpo") %>%  # isfpo twittert überwiegend in französich
+  filter(., !screen_name %in% "udcvr64") %>%  # udcvr64 twittert überwiegend in französich  
+  filter(., !screen_name %in% "MathiasReynard") %>%  # MathiasReynard twittert überwiegend in französich    
+  filter(., !screen_name %in% "nantermod") %>%  # nantermod twittert überwiegend in französich    
+  filter(., !screen_name %in% "roduitbenjamin")  # roduitbenjamin twittert überwiegend in französich    
+
+## Datensatz-ID hinzufügen
+data00 <- mutate(data00, id = as.numeric(rownames(data00)))
+
+## Hilfsvariablen löschen
+rm(var_sel)
+
+
+```
+
+
+***
+
+### 1. Tweets unterteilen und Zählen
+
+#### 1.1 Alle Tweets
+
+```{r 01_01, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Alle Texte "filtern"
+txt_all <- data00
+
+## Aggregieren
+# Aggregieren pro Tag
+dy_all <- data00 %>% 
+  filter(., date >= "2020-01-01") %>% 
+  filter(., date <= "2020-12-31") %>% 
+  select(., date) %>% 
+  table(.) %>% 
+  as.data.frame(.) %>% 
+  `colnames<-`(., c("date", "twtcnt"))
+dy_all$date <- as.Date(as.character(dy_all$date))
+dy_all$twtcnt <- as.numeric(as.character(dy_all$twtcnt))
+
+# Aggregieren pro Woche
+wk_all <- dy_all %>% 
+  group_by(., help_week = week(date)) %>% 
+  summarise_if(is.numeric, sum)
+wk_all$week <- (wk_all$help_week + 1)
+wk_all$help_week <- NULL
+colnames(wk_all) <- c("twtcnt_wk", "week")
+
+## Speichern der Ergebnisse
+saveRDS(dy_all, "./RawData/dy_all.rds")
+saveRDS(wk_all, "./RawData/wk_all.rds")
+saveRDS(txt_all, "./RawData/txt_all.rds")
+
+## Löschen der Hilfvariabeln
+rm(wk, wk_nmb, strdat, pre_mn, pst_mn, help_pre, help_pst)
+
+## Gleichstellung Mehr
+all_cnt_pre <- txt_all %>%
+  filter(., date >= "2020-01-06") %>% 
+  filter(., date <= "2020-03-08") %>% 
+  nrow(.)
+all_cnt_pst  <- txt_all %>%
+  filter(., date >= "2020-03-09") %>% 
+  filter(., date <= "2020-05-10") %>% 
+  nrow(.)
+wk_all_diff <- ((all_cnt_pst - all_cnt_pre) / 9) %>% 
+ round(., digits = 2)
+wk_all_diff
+wk_all_prc <- ((wk_all_diff / (all_cnt_pre/9)) * 100) %>%
+  round(., digits = 2)
+wk_all_prc
+
+
+```
+
+***
+
+#### 1.2 Alle Corona-Tweets
+
+```{r 01_02, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Filtern nach "Corona-Tweets" (Diese Worte kamen in ...
+## ...den 500 häufigsten Worte vor. "Mundschutz", ist nicht unter den 500)
+txt_crn <- data00[which(str_detect(data00$text,  regex("corona", ignore_case = TRUE)) |
+                        str_detect(data00$text,  regex("covid", ignore_case = TRUE)) |
+                        str_detect(data00$text,  regex("shutdown", ignore_case = TRUE)) |
+                        str_detect(data00$text,  regex("lockdown", ignore_case = TRUE)) |
+                        str_detect(data00$text,  regex("virus", ignore_case = TRUE)) |
+                        str_detect(data00$text,  regex("pandemie", ignore_case = TRUE))), ]
+
+## entfernen der 5 (vermeintlichen) "Corona-Tweets" die "srfvirus" enthalten
+txt_crn <- txt_crn[which(!str_detect(txt_crn$text,  regex("srfvirus", ignore_case = TRUE))) , ]
+
+## Aggregieren
+# Aggregieren pro Tag
+dy_crn <- txt_crn %>% 
+  filter(., date >= "2020-01-01") %>% 
+  filter(., date <= "2020-12-31") %>% 
+  select(., created_at)
+# Tageweise aggregieren
+dy_crn$date <- dy_crn$created_at %>% 
+  str_extract(., "\\d{4}-\\d{2}-\\d{2}") %>% 
+  as.character(.) %>% 
+    as.Date(., "%Y-%m-%d")
+dy_crn <- dy_crn %>% 
+  select(., date) %>% 
+  table(.) %>% 
+  as.data.frame(.) %>% 
+  `colnames<-`(., c("date", "twtcnt"))
+dy_crn$date <- as.Date(as.character(dy_crn$date))
+dy_crn$twtcnt <- as.numeric(as.character(dy_crn$twtcnt))
+# Aggregieren pro Woche
+wk_crn <- dy_crn %>% 
+  group_by(., help_week = week(date)) %>% 
+  summarise_if(is.numeric, sum)
+wk_crn$week <- (wk_crn$help_week + 1)
+wk_crn$help_week <- NULL
+colnames(wk_crn) <- c("twtcnt_wk", "week")
+
+## Speichern der Ergebnisse
+saveRDS(dy_crn, "./RawData/dy_crn.rds")
+saveRDS(wk_crn, "./RawData/wk_crn.rds")
+saveRDS(txt_crn, "./RawData/txt_crn.rds")
+
+## Löschen der Hilfvariabeln
+rm(wk, wk_nmb, strdat)
+
+
+```
+
+***
+
+#### 1.3 Alle Gleichstellungs-Tweets
+
+```{r 01_03, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Filtern nach "Gleichstellungstweets"
+txt_glst <- data00[which(str_detect(data00$text, regex("metoo", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("helvetiaruft", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("gleichberech", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("lohngleich", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("gleichstell", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("equalpayday", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex(" gender", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("sexis", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("frauen", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("feminis", ignore_case = TRUE))), ]
+# Entfernen der 6 vermeintlichen Gleichstellungstweets, die "Frauenfeld" enthalten
+txt_glst <- txt_glst[which(!str_detect(txt_glst$text, regex("frauenfeld", ignore_case = TRUE))),]
+
+## Aggregieren.
+# Aggregieren pro Tag
+dy_glst <- txt_glst %>%
+  filter(., date >= "2020-01-01") %>% 
+  filter(., date <= "2020-12-31") %>% 
+  select(., created_at)
+# Tageweise aggregieren
+dy_glst$date <- dy_glst$created_at %>% 
+  str_extract(., "\\d{4}-\\d{2}-\\d{2}") %>% 
+  as.character(.) %>% 
+    as.Date(., "%Y-%m-%d")
+dy_glst <- dy_glst %>% 
+  select(., date) %>% 
+  table(.) %>% 
+  as.data.frame(.) %>% 
+  `colnames<-`(., c("date", "twtcnt"))
+dy_glst$date <- as.Date(as.character(dy_glst$date))
+dy_glst$twtcnt <- as.numeric(as.character(dy_glst$twtcnt))
+
+# Aggregieren pro Woche
+wk_glst <- dy_glst %>% 
+  group_by(., help_week = week(date)) %>% 
+  summarise_if(is.numeric, sum)
+wk_glst$week <- (wk_glst$help_week + 1)
+wk_glst$help_week <- NULL
+colnames(wk_glst) <- c("twtcnt_wk", "week")
+
+## Speichern der Ergebnisse
+saveRDS(dy_glst, "./RawData/dy_glst.rds")
+saveRDS(wk_glst, "./RawData/wk_glst.rds")
+saveRDS(txt_glst, "./RawData/txt_glst.rds")
+
+## Löschen der Hilfvariabeln
+rm(wk, wk_nmb, strdat, pre_mn, pst_mn, help_pst, help_pre)
+
+## Gleichstellung Mehr
+glst_cnt_pre <- txt_glst %>%
+  filter(., date >= "2020-01-06") %>% 
+  filter(., date <= "2020-03-08") %>% 
+  nrow(.)
+glst_cnt_pst  <- txt_glst %>%
+  filter(., date >= "2020-03-09") %>% 
+  filter(., date <= "2020-05-10") %>% 
+  nrow(.)
+wk_glst_diff <- ((glst_cnt_pst - glst_cnt_pre) / 9) %>% 
+ round(., digits = 2)
+wk_glst_diff
+wk_glst_prc <- ((wk_glst_diff / (glst_cnt_pre/9)) * 100) %>%
+  round(., digits = 2)
+wk_glst_prc
+
+
+
+```
+
+***
+
+#### 1.4 Alle Klima-Tweets
+
+```{r 01_04, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Filtern nach "Klima-Tweets"
+txt_klima <- data00[which(str_detect(data00$text, regex("klima", ignore_case = TRUE)) |
+                            str_detect(data00$text, regex("erwärmung", ignore_case = TRUE))), ]
+txt_klima$date <- as.Date(txt_klima$date)
+
+## Aggregieren
+# Aggregieren pro Tag
+dy_klima <- txt_klima %>%
+  filter(., date >= "2020-01-01") %>% 
+  filter(., date <= "2020-12-31") %>% 
+  select(., created_at)
+# Tageweise aggregieren
+dy_klima$date <- dy_klima$created_at %>% 
+  str_extract(., "\\d{4}-\\d{2}-\\d{2}") %>% 
+  as.character(.) %>% 
+    as.Date(., "%Y-%m-%d")
+dy_klima <- dy_klima %>% 
+  select(., date) %>% 
+  table(.) %>% 
+  as.data.frame(.) %>% 
+  `colnames<-`(., c("date", "twtcnt"))
+dy_klima$date <- as.Date(as.character(dy_klima$date))
+dy_klima$twtcnt <- as.numeric(as.character(dy_klima$twtcnt))
+
+# Aggregieren pro Woche
+wk_klima <- dy_klima %>% 
+  group_by(., help_week = week(date)) %>% 
+  summarise_if(is.numeric, sum)
+wk_klima$week <- (wk_klima$help_week + 1)
+wk_klima$help_week <- NULL
+colnames(wk_klima) <- c("twtcnt_wk", "week")
+
+## Speichern der Ergebnisse
+saveRDS(dy_klima, "./RawData/dy_klima.rds")
+saveRDS(wk_klima, "./RawData/wk_klima.rds")
+saveRDS(txt_klima, "./RawData/txt_klima.rds")
+
+## Löschen der Hilfvariabeln
+rm(wk, wk_nmb, strdat, pre_help, pst_help, pre_mn, pst_mn)
+
+# Klima Mehr
+klima_cnt_pre <- txt_klima %>%
+  filter(., date >= "2020-01-06") %>% 
+  filter(., date <= "2020-03-08") %>% 
+  nrow(.)
+klima_cnt_pst  <- txt_klima %>%
+  filter(., date >= "2020-03-09") %>% 
+  filter(., date <= "2020-05-10") %>% 
+  nrow(.)
+wk_klima_diff <- ((klima_cnt_pst - klima_cnt_pre) / 9) %>% 
+ round(., digits = 2)
+wk_klima_diff
+wk_klima_prc <- ((wk_klima_diff / (klima_cnt_pre/9)) * 100) %>%
+  round(., digits = 2)
+wk_klima_prc
+
+
+
+
+```
+
+***
+
+#### 1.5 Alle Rest-Tweets
+
+```{r 01_05, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Filtern nach ""
+idvct <- as.numeric(as.character(txt_crn$id)) %>% 
+  append(., as.numeric(as.character(txt_glst$id))) %>% 
+  append(., as.numeric(as.character(txt_klima$id))) %>% 
+  unique(.) # Doppelnennungen entfernen (z.B.Klima und Covid)
+txt_rest <- txt_all %>% 
+  filter(., !id %in% idvct)
+
+## Alle Zeitraum 2020-01-01 bis 2020-05-31.
+# Aggregieren pro Tag
+dy_rest <- txt_rest %>% 
+  filter(., date >= "2020-01-01") %>% 
+  filter(., date <= "2020-12-31") %>% 
+  select(., created_at)
+# Tageweise aggregieren (ohgott, wie ich das elende datumsformat verabscheue!)
+dy_rest$date <- dy_rest$created_at %>% 
+  str_extract(., "\\d{4}-\\d{2}-\\d{2}") %>% 
+  as.character(.) %>% 
+  as.Date(., "%Y-%m-%d")
+dy_rest <- dy_rest %>% 
+  select(., date) %>% 
+  table(.) %>% 
+  as.data.frame(.) %>% 
+  `colnames<-`(., c("date", "twtcnt"))
+dy_rest$date <- as.Date(as.character(dy_rest$date))
+dy_rest$twtcnt <- as.numeric(as.character(dy_rest$twtcnt))
+
+# Aggregieren pro Woche
+wk_rest <- dy_rest %>% 
+  group_by(., help_week = week(date)) %>% 
+  summarise_if(is.numeric, sum)
+wk_rest$week <- (wk_rest$help_week + 1)
+wk_rest$help_week <- NULL
+colnames(wk_rest) <- c("twtcnt_wk", "week")
+
+## Speichern der Ergebnisse
+saveRDS(dy_rest, "./RawData/dy_rest.rds")
+saveRDS(wk_rest, "./RawData/wk_rest.rds")
+saveRDS(txt_rest, "./RawData/txt_rest.rds")
+
+## Löschen der Hilfvariabeln
+rm(wk, wk_nmb, strdat)
+
+```
+
+
+***
+
+### 2. Tweets Zählen nach Parteien
+
+Hier wird der Anteil an den Klima- und Gleichstellungstweets nach Parteien und "Vor Lockdown" bzw. "Während Lockdown" berechnet.
+
+```{r 02, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Anteile Gleichstellungs-Tweets nach Partei / Vor- und während des Shutdowns
+# Vor Shutdown
+glst_preld <- txt_glst %>%
+  filter(., date >= "2020-01-06") %>% 
+  filter(., date <= "2020-03-08") %>% 
+  select(., party_short) %>% 
+  table(.) %>% 
+  data.frame(.) %>% 
+  `colnames<-`(c("party_short", "precnt"))
+hlp_sum <- glst_preld$precnt %>% 
+  sum(.) %>% 
+  as.numeric(.)
+glst_preld$preperc <- 100 * (glst_preld$precnt / hlp_sum) %>% 
+  round(., digits = 3)
+# Nach Shutdown
+glst_pstld <- txt_glst %>%
+  filter(., date >= "2020-03-09") %>% 
+  filter(., date <= "2020-05-10") %>% 
+  select(., party_short) %>% 
+  table(.) %>% 
+  data.frame(.) %>% 
+  `colnames<-`(c("party_short", "pstcnt"))
+hlp_sum <- glst_pstld$pstcnt %>% 
+  sum(.) %>% 
+  as.numeric(.)
+glst_pstld$pstperc <- 100 * (glst_pstld$pstcnt / hlp_sum) %>% 
+  round(., digits = 3)
+# Zusammenführen der Ergebnisse
+glst_prty_comp <- glst_pstld %>% 
+  merge(., glst_preld, by = "party_short", all = TRUE)
+glst_prty_comp[is.na(glst_prty_comp)] <- 0
+
+
+## Anteile Klima-Tweets nach Partei / Vor- und während des Shutdowns
+# Vor Shutdown
+klima_preld <- txt_klima %>%
+  filter(., date >= "2020-01-06") %>% 
+  filter(., date <= "2020-03-08") %>%  
+  select(., party_short) %>% 
+  table(.) %>% 
+  data.frame(.) %>% 
+  `colnames<-`(c("party_short", "precnt"))
+hlp_sum <- klima_preld$precnt %>% 
+  sum(.) %>% 
+  as.numeric(.)
+klima_preld$preperc <- 100 * (klima_preld$precnt / hlp_sum) %>% 
+  round(., digits = 3)
+# Nach Shutdown
+klima_pstld <- txt_klima %>%
+  filter(., date >= "2020-03-09") %>% 
+  filter(., date <= "2020-05-10") %>% 
+  select(., party_short) %>% 
+  table(.) %>% 
+  data.frame(.) %>% 
+  `colnames<-`(c("party_short", "pstcnt"))
+hlp_sum <- klima_pstld$pstcnt %>% 
+  sum(.) %>% 
+  as.numeric(.)
+klima_pstld$pstperc <- 100 * (klima_pstld$pstcnt / hlp_sum) %>% 
+  round(., digits = 3)
+# Zusammenführen der Ergebnisse
+klima_prty_comp <- klima_pstld %>% 
+  merge(., klima_preld, by = "party_short", all = TRUE)
+# NA's durch "0" erstetzen
+klima_prty_comp[is.na(klima_prty_comp)] <- 0
+
+## Ausgabe
+# Klima
+klima_prty_comp %>% 
+  select(., party_short, preperc, pstperc, precnt, pstcnt) %>% 
+kable(., caption = "Klima-Tweets - Anteil der Tweets nach Parteien",
+          row.names = FALSE, col.names = c("Partei", "Vor Shutdown [%]", "Im Shutdown [%]", "Vor Shutdown [-]", "Im Shutdown [-]"))
+klima_prty_comp
+
+# Gleichstellung
+glst_prty_comp %>% 
+  select(., party_short, preperc, pstperc, precnt, pstcnt) %>% 
+kable(., caption = "Gleichstellungs-Tweets - Anteil der Tweets nach Parteien",
+          row.names = FALSE, col.names = c("Partei", "Vor Shutdown [%]", "Im Shutdown [%]", "Vor Shutdown [-]", "Im Shutdown [-]"))
+glst_prty_comp
+
+
+```
