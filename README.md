@@ -31,5 +31,5 @@ https://lms.uzh.ch/auth/1%3A1%3A1210638843%3A3%3A0%3Aserv%3Ax/data/NR_SR_Jan_Okt
 
 **Schlüsselworte**<br>Folgende Schlüsselworte wurden benutzt, um die verschiedenen Tweets zu identifizieren. Dabei genügt es, wenn die untengenannten ausdrücke zum Teil enthalten sind, gross- bzw. kleinschreibung spielt keine rolle (_partial match_ & _case insensitive_):
   + Corona: "corona", "covid", "shutdown", "lockdown", "virus", "pandemie"
-  + Gleichstellung: "metoo""helvetiaruft", "gleichberech", "lohngleich", "gleichstell", "equalpayday", " gender", "sexis", "frauen", "feminis"
-  + Klima: "klima", "erwärmung"
+  + Gleichstellung: "metoo", "helvetiaruft", "gleichberech", "lohngleich", "gleichstell", "equalpayday", " gender", "sexis", "frauen", "feminis"
+  + Klima: "klima", "erwärmung", "co2", "kohlendiox"
