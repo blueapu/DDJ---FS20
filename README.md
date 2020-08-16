@@ -11,25 +11,25 @@ Im Ordner _DDJ_FS20_Blog_Code_Replikation_ finden sich die vier verschiedene Cod
 https://lms.uzh.ch/auth/1%3A1%3A1210638843%3A3%3A0%3Aserv%3Ax/data/NR_SR_Jan_Okt_2019.RData) heruntergeladen, und im Unterordner _RawData_ abgespeichert werden.
 <br><br>
 
-**DDJ_Blog_Count_final**
+**DDJ_Blog_Count_final01**
   + Berechnet die Zahlen und Anteile der Tweets.
   + Benötigt den Datensatz _df_tweets01b.rds_ (siehe oben).
   + Erzeugt die Datensätze _txt_all.rds_, _txt_crn.rds_, _txt_gstl.rds_, _txt_klima.rds_, _txt_rest.rds_.
 <br><br>
 
-**DDJ_Blog_Text_final**
+**DDJ_Blog_Text_final01**
   + Berechnet und vergleicht die Häufigkeiten und Ränge der Ausdrücke und erstellt die Wordclouds.
   + Benötigt die Datensätze _txt_all.rds_, _txt_crn.rds_, _txt_gstl.rds_, _txt_klima.rds_, _txt_rest.rds_ (siehe oben).
 <br><br>
   
-**DDJ_Blog_Plots_final**
+**DDJ_Blog_Plots_final01**
   + Plotted und speichert das Säulendiagram.
   + Benötigt die Datensätze _txt_all.rds_, _txt_crn.rds_, _txt_gstl.rds_, _txt_klima.rds_, _txt_rest.rds_ (siehe oben)
 <br><br>
 
 *****
 
-**Schlüsselworte**<br>Folgende Schlüsselworte wurden benutzt, um die verschiedenen Tweets zu identifizieren. Dabei genügt es, wenn die untengenannten ausdrücke zum Teil enthalten sind, gross- bzw. kleinschreibung spielt keine rolle (_partial match_ & _case insensitive_):
+**Schlüsselworte**<br>Folgende Schlüsselworte wurden benutzt, um die verschiedenen Tweets zu identifizieren. Dabei genügt es, wenn die untengenannten Ausdrücke zum Teil enthalten sind, Gross- bzw. Kleinschreibung spielt keine Rolle (_partial match_ & _case insensitive_):
   + Corona: "corona", "covid", "shutdown", "lockdown", "virus", "pandemie"
   + Gleichstellung: "metoo", "helvetiaruft", "gleichberech", "lohngleich", "gleichstell", "equalpayday", " gender", "sexis", "frauen", "feminis"
   + Klima: "klima", "erwärmung", "co2", "kohlendiox"
