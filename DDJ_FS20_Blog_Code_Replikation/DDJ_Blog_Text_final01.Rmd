@@ -1,0 +1,367 @@
+---
+title: "DDJ Blogbeitrag **Text** _final01_"
+author: "Markus Rottmann"
+date: "2020 08 14"
+output:
+  html_document:
+      toc: true
+      toc_depth: 5
+---
+
+
+```{r setup, include=FALSE}
+
+## 0.1: cleaing memory
+rm(list=ls(all=T))
+
+## 0.2 defining options
+options(repos="https://cran.rstudio.com")
+options(stringsAsFactors = FALSE)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 5)
+
+## 0.3 installing and loading needed packages
+# install & load packages
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("knitr")
+library(knitr)
+# install.packages("kableExtra")
+# library(kableExtra)
+# install.packages("rvest")
+library(rvest)
+# install.packages("magrittr")
+library(magrittr)
+# install.packages("pageviews")
+# library(pageviews)
+# install.packages("WikipediR")
+# library(WikipediR)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.packages("tibble")
+# library(tibble)
+# install.packages("quanteda")
+library(quanteda)
+# install.packages("stargazer")
+library(stargazer)
+# install.packages("tidyr")
+library(tidyr)
+# install.packages("stringr")
+library(stringr)
+#install.packages("lme4")
+library(lme4)
+# install.packages("rtweet")
+library(rtweet)
+# install.packages("lubridate")
+library(lubridate)
+# install.packages("reshape2")
+library(reshape2)
+
+
+
+
+
+```
+
+
+***
+
+### 1. Laden und Vorbereiten der Grunddaten
+
+Die hier benötigten Datensätze `wk_crn.rds`, `wk_klima.rds`, `wk_glst.rds` und `wk_rest.rds` wurden mit dem Code `DDJ_Blog_Count_final.rds` erstellt.
+
+```{r 01, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Daten Laden
+txt_all <- readRDS("./RawData/txt_all.rds")
+txt_crn <- readRDS("./RawData/txt_crn.rds")
+txt_klima <- readRDS("./RawData/txt_klima.rds")
+txt_glst <- readRDS("./RawData/txt_glst.rds")
+txt_rest <- readRDS("./RawData/txt_rest.rds")
+
+```
+
+***
+
+### 2. Gesamter Text
+
+#### 2.1 Gesamter Text - Ganzer Zeitraum (Alle, Unterschied Partei, Unterschied Geschlecht)
+
+```{r 02_01, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## Corpus & DFM erstellen
+# corpus erstellen
+corp_all <- txt_all %>% 
+  corpus(., text_field = "text")
+# dfm erstellen, incl. Rausfiltern Stopwords und...
+# ...Worte hinter "@" entfernt (remove_twitter = TRUE)...
+# ...entfernt nur "@"
+dfm_all <- corp_all %>% 
+  tokens(., what = c("word"),
+         remove_punct = TRUE,
+         remove_url = TRUE, 
+         remove_numbers = TRUE) %>% 
+  tokens_remove(., stopwords("german")) %>% 
+  tokens_remove(., stopwords("french")) %>% 
+  tokens_remove(., stopwords("italian")) %>% 
+  tokens_remove(., stopwords("english")) %>% 
+  tokens_remove(pattern = "^[@].+$", valuetype = "regex") %>%  #  @ 
+  dfm(.)
+
+
+## Alle
+# als Tabelle
+txtfreq_all <- textstat_frequency(dfm_all) %>% 
+                head(., n = 500) %>% 
+                as.data.frame(.)
+
+# als Wordcloud
+wrdcld_all <- dfm_all %>% 
+              textplot_wordcloud(., max_words = 250)
+  
+# Speichern
+saveRDS(txtfreq_all, file = "./txtfreq_all.rds")
+
+## Partei
+# als Tabelle
+txtfreq_party <- textstat_frequency(dfm_all, n = 100, groups = "party_short") %>% 
+                as.data.frame(.)
+prty_sel <- c("BDP", "CVP", "SVP", "FDP", "SP", "GLP", "GPS")
+# als Wordcloud
+col <- c("#FFDC00", "#FF8700", "#009A2E", "#063CFF",
+                 "#FF0000", "#009A2E", "#2AE802") # SRF-Parteifarben
+wrdcld_party <- dfm_all %>%
+                dfm_subset(., subset = (party_short == prty_sel)) %>% 
+                dfm_group("party_short") %>%
+                textplot_wordcloud(., comparison = TRUE, max_words = 2000, 
+                    color = col, labelcolor = "grey")
+# Speichern
+saveRDS(txtfreq_party, file = "./txtfreq_party.rds")
+
+## Geschlecht
+# als Tabelle
+txtfreq_gender <- textstat_frequency(dfm_all, n = 100, groups = "gender") %>% 
+                as.data.frame(.)
+# als Wordcloud
+wrdcld_gender <- dfm_all%>%
+                 dfm_group("gender") %>%
+                 textplot_wordcloud(., comparison = TRUE, max_words = 200, 
+                                    color = c("red", "blue"))
+# Speichern
+saveRDS(txtfreq_gender, file = "./txtfreq_gender.rds")
+
+## Hilfsvariablen löschen
+# rm(txtfreq_all, txtfreq_gender, txtfreq_party, corp_all,
+#   col, prty_sel)
+
+
+
+```
+
+***
+
+#### 2.2 Gesamter Text -  Vor/Während Shutdown (Rangvergleich und Wordcloud)
+
+Vor Shutdown: 2020-01-06 - 2020-03-08
+Während Shutdown: 2020-03-09 - 2020-05-10
+
+```{r 02_02, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## 500 häufigste Ausdrücke (vor und nach 09. März)
+dfm_all_comp <- dfm_all %>% 
+     dfm_subset(., date >= "2020-01-06") %>% 
+     dfm_subset(., date <= "2020-05-10")
+
+txtfreq_all_comp <- dfm_all_comp %>% 
+     textstat_frequency(., n = 500, groups = "shtdwn") %>% 
+     as.data.frame(.)
+# als Wordcloud (vor und nach 9. März)
+wrdcld_all_comp <- dfm_all_comp %>%
+                  dfm_group("shtdwn") %>%
+                  textplot_wordcloud(., comparison = TRUE, max_words = 100, 
+                                     color = c("darkgreen", "red"))
+wrdcld_all_comp 
+
+## Rangvergleich
+# Erstellen des datensatzes "Pre-Shutdown"
+predf <- txtfreq_all_comp %>% 
+  filter(., group %in% "vorher") %>% 
+  `colnames<-`(.,c("feature", "prefreq", "prerank", "predocfreq", "group")) %>% 
+  select(., feature, prefreq, prerank, predocfreq)
+# Erstellen des datensatzes "Shutdown"
+postdf <- txtfreq_all_comp %>% 
+  filter(., group %in% "waehrend") %>% 
+  `colnames<-`(.,c("feature", "postfreq", "postrank", "postdocfreq", "group")) %>% 
+  select(., feature, postfreq, postrank, postdocfreq)
+# Vereinigung des Pre- und Postcoronadatensatzes
+wrdcomp_all <- merge(x = predf, y = postdf, by = "feature")
+# Berechnen des Rangunterschieds
+wrdcomp_all$rgdiff <- wrdcomp_all$prerank - wrdcomp_all$postrank
+
+
+```
+
+***
+
+### 3. Teiltexte
+
+#### 3.1 Klima-Tweets. Vor/Während Shutdown (Wordcloud und Rangvergleich)
+
+Vor Shutdown: 2020-01-06 - 2020-03-12
+Während Shutdown: 2020-03-13 - 2020-05-11
+
+```{r 03_01, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## DFM & Corpums der "Klima"-Tweets erstellen
+# corpus erstellen
+corp_klima <- txt_klima %>% 
+  corpus(., text_field = "text")
+# dfm erstellen, incl. Rausfiltern Stopwords und...
+# ...Worte hinter "@" entfernt (remove_twitter = TRUE)...
+# ...entfernt nur "@"
+
+
+dfm_klima <- corp_klima %>% 
+  tokens(., what = c("word"),
+         remove_punct = TRUE,
+         remove_url = TRUE,
+         remove_numbers = TRUE) %>% 
+  tokens_remove(., stopwords("german")) %>% 
+  tokens_remove(., stopwords("french")) %>% 
+  tokens_remove(., stopwords("italian")) %>% 
+  tokens_remove(., stopwords("english")) %>% 
+  tokens_remove(pattern = "^[@].+$", valuetype = "regex") %>% #  @ 
+  dfm(.)
+
+
+## 500 häufigste Ausdrücke (vor und nach 9. März)
+dfm_klima_comp <- dfm_klima %>% 
+     dfm_subset(., date >= "2020-01-06") %>% 
+     dfm_subset(., date <= "2020-05-10")
+
+txtfreq_klima_comp <- dfm_klima_comp %>% 
+     textstat_frequency(., n = 500, groups = "shtdwn") %>% 
+     as.data.frame(.)
+
+# als Wordcloud
+wrdcld_klima_comp <- dfm_klima_comp %>%
+                 dfm_group("shtdwn") %>%
+                 textplot_wordcloud(., comparison = TRUE, max_words = 200,
+                                    color = c("darkgreen", "red"))
+
+## Rangvergleich
+# Erstellen des datensatzes "Pre-Corona"
+predf <- txtfreq_klima_comp %>% 
+  filter(., group %in% "vorher") %>% 
+  `colnames<-`(.,c("feature", "prefreq", "prerank", "predocfreq", "group")) %>% 
+  select(., feature, prefreq, prerank, predocfreq)
+# Erstellen des datensatzes "Post-Corona"
+postdf <- txtfreq_klima_comp %>% 
+  filter(., group %in% "waehrend") %>% 
+  `colnames<-`(.,c("feature", "postfreq", "postrank", "postdocfreq", "group")) %>% 
+  select(., feature, postfreq, postrank, postdocfreq)
+# Vereinigung des Pre- und Postcoronadatensatzes
+rnk_klima_comp <- merge(x = predf, y = postdf, by = "feature")
+rnk_klima_comp2 <- merge(x = predf, y = postdf, by = "feature", all = TRUE)
+# Berechnen des Rangunterschieds
+rnk_klima_comp$rgdiff <- rnk_klima_comp$prerank - rnk_klima_comp$postrank
+rnk_klima_comp2$rgdiff <- rnk_klima_comp2$prerank - rnk_klima_comp2$postrank
+
+# Speichern
+saveRDS(txtfreq_klima_comp, file = "./RawData/txtfreq_klima_comp.rds")
+saveRDS(rnk_klima_comp, file = "./RawData/rnk_klima_comp.rds")
+saveRDS(rnk_klima_comp2, file = "./RawData/rnk_klima_comp2.rds")
+
+## Anzeigen
+# Als Wordcloud
+wrdcld_klima_comp
+# Als Tabelle
+rnk_klima_comp %>% 
+    arrange(., desc(rgdiff)) %>% 
+    kable(., caption = "Veränderung Klimatweets - Rangvergleich",
+          row.names = FALSE)
+
+## Hilfsvariablen löschen
+rm(dfm_klima, corp_klima, postdf, predf)
+
+```
+
+***
+
+#### 3.2 Gleichstellungs-Tweets. Vor/Während Shutdown (Wordcloud und Rangvergleich)
+
+Vor Shutdown: 2020-01-06 - 2020-03-12
+Während Shutdown: 2020-03-13 - 2020-05-11
+
+```{r 03_02, include = TRUE, results = TRUE, eval = TRUE, message = FALSE, warning = FALSE}
+
+## DFM & Corpums der "Klima"-Tweets erstellen
+# corpus erstellen
+corp_glst <- txt_glst %>% 
+  corpus(., text_field = "text")
+# dfm erstellen, incl. Rausfiltern Stopwords und...
+# ...Worte hinter "@" entfernt (remove_twitter = TRUE)...
+# ...entfernt nur "@"
+dfm_glst <- corp_glst %>% 
+  tokens(., what = c("word"),
+         remove_punct = TRUE,
+         remove_url = TRUE,
+         remove_numbers = TRUE) %>% 
+  tokens_remove(., stopwords("german")) %>% 
+  tokens_remove(., stopwords("french")) %>% 
+  tokens_remove(., stopwords("italian")) %>% 
+  tokens_remove(., stopwords("english")) %>% 
+  tokens_remove(pattern = "^[@].+$", valuetype = "regex") %>%  #  @ 
+  dfm(.)
+
+## 500 häufigste Ausdrücke (vor und nach 9. März)
+dfm_glst_comp <- dfm_glst %>% 
+     dfm_subset(., date >= "2020-01-06") %>% 
+     dfm_subset(., date <= "2020-05-10")
+
+txtfreq_glst_comp <- dfm_glst_comp %>% 
+     textstat_frequency(., n = 500, groups = "shtdwn") %>% 
+     as.data.frame(.)
+
+# als Wordcloud
+wrdcld_glst_comp <- dfm_glst_comp %>%
+                 dfm_group("shtdwn") %>%
+                 textplot_wordcloud(., comparison = TRUE, max_words = 200,
+                                    color = c("darkgreen", "red"))
+
+## Rangvergleich
+# Erstellen des datensatzes "Pre-Corona"
+predf <- txtfreq_glst_comp %>% 
+  filter(., group %in% "vorher") %>% 
+  `colnames<-`(.,c("feature", "prefreq", "prerank", "predocfreq", "group")) %>% 
+  select(., feature, prefreq, prerank, predocfreq)
+# Erstellen des datensatzes "Post-Corona"
+postdf <- txtfreq_glst_comp %>% 
+  filter(., group %in% "waehrend") %>% 
+  `colnames<-`(.,c("feature", "postfreq", "postrank", "postdocfreq", "group")) %>% 
+  select(., feature, postfreq, postrank, postdocfreq)
+# Vereinigung des Pre- und Postcoronadatensatzes
+rnk_glst_comp <- merge(x = predf, y = postdf, by = "feature")
+rnk_glst_comp2 <- merge(x = predf, y = postdf, by = "feature", all = TRUE) 
+# Berechnen des Rangunterschieds
+rnk_glst_comp$rgdiff <- rnk_glst_comp$prerank - rnk_glst_comp$postrank
+rnk_glst_comp2$rgdiff <- rnk_glst_comp2$prerank - rnk_glst_comp2$postrank
+
+# Speichern
+saveRDS(txtfreq_glst_comp, file = "./RawData/txtfreq_glst_comp.rds")
+saveRDS(rnk_glst_comp, file = "./RawData/rnk_glst_comp.rds")
+saveRDS(rnk_glst_comp2, file = "./RawData/rnk_glst_comp2.rds")
+
+## Anzeigen
+# Als Wordcloud
+wrdcld_glst_comp
+# Als Tabelle
+rnk_glst_comp %>% 
+    arrange(., desc(rgdiff)) %>% 
+    kable(., caption = "Veränderung Klimatweets - Rangvergleich",
+          row.names = FALSE)
+
+## Hilfsvariablen löschen
+rm(dfm_glst, corp_klima, postdf, predf)
+
+```
+
